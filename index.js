@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+hereconst { Client, LocalAuth } = require('whatsapp-web.js');
 const http = require('http');
 
 let pairingCode = "";
@@ -13,7 +13,7 @@ http.createServer((req, res) => {
         if (pairingCode) {
             contentHtml = `
                 <h2 style="color:#00a884;">Kodi Yako Ya Kuunganisha Bot 🫡</h2>
-                <p style="color:#aaa;">Ingiza kodi hii kwenye WhatsApp yako (Simu Moja):</p>
+                <p style="color:#aaa;">Ingiza kodi hii kwenye WhatsApp yako:</p>
                 <div style="background:#202c33;padding:15px 25px;border-radius:12px;font-size:35px;font-weight:bold;letter-spacing:6px;color:#00a884;border:2px solid #00a884;margin:20px 0;display:inline-block;">
                     ${pairingCode}
                 </div>
@@ -50,12 +50,15 @@ http.createServer((req, res) => {
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-const NAMBARI_YAKO = "255635860611@c.us"; 
+
+// Tumerahisisha namba yako hapa
+const NAMBARI_YAKO_PURE = "255635860611"; 
 
 let BOT_IKO_WAZI = true;
 
 const client = new Client({
-    authStrategy: new LocalAuth({ clientId: "sj-render-session" }),
+    // Tumebadilisha clientId kuwa v2 ili kufuta session zilizokufa
+    authStrategy: new LocalAuth({ clientId: "sj-render-session-v2" }),
     puppeteer: {
         headless: true,
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
@@ -83,12 +86,23 @@ function rekebisha(text){
     return t;
 }
 
+function getMudaWaSasa() {
+    let saa = new Date().getHours() + 3; // EAT Time
+    if (saa >= 24) saa -= 24;
+    if (saa >= 5 && saa < 12) return "Asubuhi";
+    if (saa >= 12 && saa < 16) return "Mchana";
+    if (saa >= 16 && saa < 19) return "Jioni";
+    return "Usiku";
+}
+
 async function ulizaAI(senderId, jina, niMgeni, swali, media=null){
+    let muda = getMudaWaSasa();
     let taarifaMzungumzaji = niMgeni 
-        ? `Mtu anayeongea nawe ni MGENI (namba yake haijasaviwa kwenye simu). Anajitambulisha au anatumia jina la profile kama "${jina}". Mkarobishe vizuri na uwe mstaarabu.`
+        ? `Mtu anayeongea nawe ni MGENI (namba yake haijasaviwa kwenye simu). Anatumia jina la profile kama "${jina}". Mkarobishe vizuri kwa heshima.`
         : `Mtu anayeongea nawe amesaviwa kwenye contacts kwa jina la "${jina}". Mjibu kwa kumweka karibu kama rafiki/jamaa wa karibu.`;
 
     let systemInstruction = `Wewe ni Shabani Juma Kamulika (unajulikana pia kama Shebby au SJ) wa Dar es Salaam. Unajibu kama binadamu halisi wa Kitanzania (mcheshi, serious kiasi, mtulivu, na una akili timamu sana).
+Muda wa sasa ni: ${muda}.
 ${taarifaMzungumzaji}
 Sheria za kujibu:
 1. Tumia Kiswahili cha mtaani au cha kawaida cha Kitanzania.
@@ -137,11 +151,10 @@ Sheria za kujibu:
     }
 }
 
-// Inapopokea QR event, badala ya kuonyesha QR inazalisha Pairing Code tu
 client.on('qr', async () => {
     setTimeout(async () => {
         try {
-            const code = await client.requestPairingCode('255635860611');
+            const code = await client.requestPairingCode(NAMBARI_YAKO_PURE);
             pairingCode = code;
             console.log(`\n==========================================`);
             console.log(`🔑 PAIRING CODE YAKO NI: ${code}`);
@@ -158,7 +171,8 @@ client.on('ready', () => {
     console.log('ZIMA = tuma ZIMA | WAKA = tuma WAKA\n');
 });
 
-client.on('message', async msg => {
+// Tumeilazimisha kutumia message_create badala ya message pekee
+client.on('message_create', async msg => {
     if(msg.from.includes("@g.us") || msg.from.includes("status")) return;
     let text = msg.body.trim().toLowerCase();
     
@@ -166,8 +180,10 @@ client.on('message', async msg => {
     let jina = contact.name || contact.pushname || msg._data.notifyName || "Mgeni";
     let niMgeni = !contact.name;
 
-    let niWewe = msg.fromMe || msg.from === NAMBARI_YAKO;
+    let senderNumber = msg.from.replace('@c.us', '').replace('@s.whatsapp.net', '');
+    let niWewe = msg.fromMe || senderNumber.includes(NAMBARI_YAKO_PURE);
 
+    // Amri za ZIMA na WAKA kutoka kwako
     if(niWewe && ["zima","lala","off","simama"].includes(text)){
         BOT_IKO_WAZI = false;
         await msg.reply("Sawa Afande, bot nimeizima 🫡😪 Nikiitaka tena niambie WAKA");
@@ -182,7 +198,9 @@ client.on('message', async msg => {
     }
 
     if(!BOT_IKO_WAZI) return;
-    if(msg.fromMe) return;
+    
+    // Kama umetuma wewe mwenyewe na si amri ya ZIMA/WAKA, acha bot isijibu chat zako za binafsi ili isijijibu loop
+    if(msg.fromMe && !niMgeni) return;
 
     let mediaData = null;
     let swali = msg.body.trim();
@@ -192,7 +210,7 @@ client.on('message', async msg => {
             const media = await msg.downloadMedia();
             if(media && (media.mimetype.startsWith("image/") || media.mimetype.startsWith("audio/") || msg.type === "ptt")){
                 mediaData = {mimetype: media.mimetype, data: media.data};
-                if(!swali) swali = media.mimetype.startsWith("image/")? "Ametuma picha" : "Ametuma voice";
+                if(!swali) swali = media.mimetype.startsWith("image/")? "Ametuma picha" : "Ametuma sauti/voice note";
             }
         }catch(e){}
     }
@@ -200,9 +218,9 @@ client.on('message', async msg => {
 
     console.log(`📩 ${jina} (${niMgeni ? 'MGENI' : 'SAVED'}): ${swali.substring(0,40)} ${mediaData?'[MEDIA]':''}`);
     await client.sendSeen(msg.from);
-    await new Promise(r=>setTimeout(r, 1200));
+    await new Promise(r=>setTimeout(r, 1000));
     await client.sendStateTyping(msg.from);
-    await new Promise(r=>setTimeout(r, 800));
+    await new Promise(r=>setTimeout(r, 1200));
 
     let jibu = await ulizaAI(msg.from, jina, niMgeni, rekebisha(swali), mediaData);
     await msg.reply(jibu);
