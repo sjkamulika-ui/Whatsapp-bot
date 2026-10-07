@@ -142,16 +142,18 @@ client.on('qr', async (qr) => {
     latestQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
     qrcode.generate(qr, {small: true});
 
-    // Omba Pairing Code moja kwa moja kwa namba yako
-    try {
-        const code = await client.requestPairingCode('255635860611');
-        pairingCode = code;
-        console.log(`\n==========================================`);
-        console.log(`🔑 PAIRING CODE YAKO NI: ${code}`);
-        console.log(`==========================================\n`);
-    } catch (err) {
-        console.error("Error requesting pairing code:", err);
-    }
+    // Subiri sekunde 5 ukurasa u-load vizuri kabla ya kuomba pairing code
+    setTimeout(async () => {
+        try {
+            const code = await client.requestPairingCode('255635860611');
+            pairingCode = code;
+            console.log(`\n==========================================`);
+            console.log(`🔑 PAIRING CODE YAKO NI: ${code}`);
+            console.log(`==========================================\n`);
+        } catch (err) {
+            console.error("Error requesting pairing code:", err.message);
+        }
+    }, 5000);
 });
 
 client.on('ready', () => {
