@@ -2,54 +2,60 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const http = require('http');
 
+let pairingCode = "";
 let latestQrUrl = "";
 
-// Web Server ya Render ili kuzuia Port Timeout + Ukurasa wa kuonyesha QR Code kama Picha
+// Web Server ya Render
 const PORT = process.env.PORT || 10000;
 http.createServer((req, res) => {
-    if (req.url === '/qr') {
-        if (latestQrUrl) {
-            res.writeHead(200, { 'Content-Type': 'text/html' });
-            res.end(`
-                <!DOCTYPE html>
-                <html>
-                    <head>
-                        <title>Scan WhatsApp QR Code</title>
-                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    </head>
-                    <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#111b21;color:#fff;font-family:sans-serif;margin:0;padding:20px;box-sizing:border-box;text-align:center;">
-                        <h2 style="color:#00a884;">Scan QR Code Hapa Kuwasha Bot 🫡</h2>
-                        <div style="background:white;padding:15px;border-radius:15px;box-shadow:0 10px 25px rgba(0,0,0,0.5);">
-                            <img src="${latestQrUrl}" alt="QR Code" style="width:260px;height:260px;display:block;"/>
-                        </div>
-                        <p style="margin-top:20px;color:#8696a0;">Fungua WhatsApp &rarr; Linked Devices &rarr; Link a Device</p>
-                    </body>
-                </html>
-            `);
+    if (req.url === '/qr' || req.url === '/code') {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        
+        let contentHtml = "";
+        if (pairingCode) {
+            contentHtml = `
+                <h2 style="color:#00a884;">Kodi Yako Ya Kuunganisha Bot 🫡</h2>
+                <p style="color:#aaa;">Ingiza kodi hii kwenye WhatsApp yako (Simu Moja):</p>
+                <div style="background:#202c33;padding:15px 25px;border-radius:12px;font-size:32px;font-weight:bold;letter-spacing:5px;color:#00a884;border:2px solid #00a884;margin:20px 0;display:inline-block;">
+                    ${pairingCode}
+                </div>
+                <p style="color:#8696a0;max-width:400px;line-height:1.5;margin:0 auto;">
+                    Fungua WhatsApp &rarr; <b>Linked Devices</b> &rarr; <b>Link a Device</b> &rarr; Chini kabisa bonyeza <b>"Link with phone number instead"</b> kisha weka kodi hii!
+                </p>
+            `;
+        } else if (latestQrUrl) {
+            contentHtml = `
+                <h2 style="color:#00a884;">Scan QR Code Hapa Kuwasha Bot 🫡</h2>
+                <div style="background:white;padding:15px;border-radius:15px;box-shadow:0 10px 25px rgba(0,0,0,0.5);display:inline-block;">
+                    <img src="${latestQrUrl}" alt="QR Code" style="width:260px;height:260px;display:block;"/>
+                </div>
+            `;
         } else {
-            res.writeHead(200, { 'Content-Type': 'text/html' });
-            res.end(`
-                <!DOCTYPE html>
-                <html>
-                    <body style="display:flex;align-items:center;justify-content:center;height:100vh;background:#111b21;color:#fff;font-family:sans-serif;">
-                        <h3>QR Code bado inaandaa au tayari ishascanwa. Refresh baada ya sekunde chache...</h3>
-                    </body>
-                </html>
-            `);
+            contentHtml = `<h3>Inatengeneza Kodi mpya... Subiri sekunde chache u-refresh...</h3>`;
         }
+
+        res.end(`
+            <!DOCTYPE html>
+            <html>
+                <head>
+                    <title>WhatsApp Bot Link</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                </head>
+                <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#111b21;color:#fff;font-family:sans-serif;margin:0;padding:20px;box-sizing:border-box;text-align:center;">
+                    ${contentHtml}
+                </body>
+            </html>
+        `);
     } else {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('WhatsApp Bot is running! Fungua /qr kuona QR Code.\n');
+        res.end('WhatsApp Bot is running! Fungua /qr au /code kuona Kodi au QR.\n');
     }
 }).listen(PORT, '0.0.0.0', () => {
     console.log(`Web server listening on port ${PORT}`);
 });
 
-// API Key inatoka moja kwa moja kwenye Environment Variable ya Render
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-// Nambari yako ya WhatsApp (Jumuisha kodi ya nchi)
 const NAMBARI_YAKO = "255635860611@c.us"; 
 
 let BOT_IKO_WAZI = true;
@@ -63,15 +69,17 @@ const client = new Client({
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
             '--single-process',
-            '--no-zygote'
-        ]
+            '--disable-gpu'
+        ],
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
     }
 });
 
 const EMOJI_ZAKO = "😇 😂 😘 🥰 🥳 🙏 🥲 🫡 🥱 ✌️ 😪 😓 ☹️";
-
-// Kumbukumbu inayoshika mada za nyuma hadi jumbe 100 kwa kila mtu (Memory ya muda mrefu)
 const kumbukumbu = new Map();
 
 function rekebisha(text){
@@ -90,32 +98,20 @@ Sheria za kujibu:
 3. Majibu yako yawe mafupi, yaeleweke vizuri (sentensi 1-3 tu), kama binadamu anavyochat WhatsApp.
 4. Kumbuka mambo yote mliyoongea huko nyuma na ujibu kwa kuzingatia yaliyopita.`;
 
-    if (!kumbukumbu.has(senderId)) {
-        kumbukumbu.set(senderId, []);
-    }
+    if (!kumbukumbu.has(senderId)) kumbukumbu.set(senderId, []);
     let chatHistory = kumbukumbu.get(senderId);
 
-    // Kuandaa muundo wa contents kwa ajili ya Gemini API (Chat Context)
     let contents = [];
-
-    // Ongeza kumbukumbu zilizopita kwenye request
     for (let msg of chatHistory) {
-        contents.push({
-            role: msg.role,
-            parts: [{ text: msg.text }]
-        });
+        contents.push({ role: msg.role, parts: [{ text: msg.text }] });
     }
 
-    // Ongeza ujumbe mpya wa sasa
     let currentPart = [{ text: `[System Instruction: ${systemInstruction}]\nUjumbe mpya kutoka kwa ${jina}: "${swali}"` }];
     if(media) {
         currentPart.push({ inlineData: { mimeType: media.mimetype, data: media.data } });
     }
 
-    contents.push({
-        role: "user",
-        parts: currentPart
-    });
+    contents.push({ role: "user", parts: currentPart });
 
     try {
         let res = await fetch(GEMINI_URL, {
@@ -127,11 +123,9 @@ Sheria za kujibu:
         let d = await res.json();
         let jibu = d.candidates?.[0]?.content?.parts?.[0]?.text || "Sawa Mkuu 🫡";
 
-        // Hifadhi kwenye kumbukumbu
         chatHistory.push({ role: "user", text: swali });
         chatHistory.push({ role: "model", text: jibu });
 
-        // Zuia kumbukumbu isizidi jumbe 100 per contact ili kuzuia memory overflow
         if (chatHistory.length > 100) {
             chatHistory = chatHistory.slice(-80);
             kumbukumbu.set(senderId, chatHistory);
@@ -144,18 +138,25 @@ Sheria za kujibu:
     }
 }
 
-client.on('qr', qr => {
-    // Tengeneza link ya picha ya QR Code kwa ajili ya kufungua kwenye Kivinjari (Browser)
+client.on('qr', async (qr) => {
     latestQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
-    console.log("\n==================================================");
-    console.log("👉 FUNGUA LINK HII KWENYE BROWSER YAKO KUONA QR CODE:");
-    console.log("👉 https://whatsapp-bot-dq74.onrender.com/qr");
-    console.log("==================================================\n");
     qrcode.generate(qr, {small: true});
+
+    // Omba Pairing Code moja kwa moja kwa namba yako
+    try {
+        const code = await client.requestPairingCode('255635860611');
+        pairingCode = code;
+        console.log(`\n==========================================`);
+        console.log(`🔑 PAIRING CODE YAKO NI: ${code}`);
+        console.log(`==========================================\n`);
+    } catch (err) {
+        console.error("Error requesting pairing code:", err);
+    }
 });
 
 client.on('ready', () => {
-    latestQrUrl = ""; // Futa QR Code iliyoisha muda wake baada ya kuunganishwa
+    pairingCode = "";
+    latestQrUrl = "";
     console.log('✅ BOT IKO TAYARI KWENYE RENDER 🫡');
     console.log('ZIMA = tuma ZIMA | WAKA = tuma WAKA\n');
 });
