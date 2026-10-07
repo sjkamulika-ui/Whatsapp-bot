@@ -63,7 +63,8 @@ async function ulizaAI(senderId, jina, swali) {
 
 // 3. Main Bot Process (Baileys Engine)
 async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState('baileys_auth_info');
+    // Tumebadilisha folder name hapa ili kufuta session zilizofeli zamani
+    const { state, saveCreds } = await useMultiFileAuthState('baileys_auth_info_v3');
     
     const sock = makeWASocket({
         logger: pino({ level: 'silent' }),
