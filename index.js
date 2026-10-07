@@ -5,12 +5,11 @@ const http = require('http');
 let pairingCode = "";
 const NAMBARI_YAKO_PURE = "255635860611"; 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 let BOT_IKO_WAZI = true;
 const kumbukumbu = new Map();
 
-// 1. Web Server ya Render kuonyesha Pairing Code
+// 1. Web Server ya Render
 const PORT = process.env.PORT || 10000;
 http.createServer((req, res) => {
     if (req.url === '/qr' || req.url === '/code') {
@@ -30,6 +29,10 @@ http.createServer((req, res) => {
 
 // 2. Akili ya Gemini AI
 async function ulizaAI(senderId, jina, swali) {
+    if (!GEMINI_API_KEY) {
+        return "⚠️ Error: API Key ya Gemini haipatikani kwenye Render Environment Variables!";
+    }
+
     let systemInstruction = `Wewe ni Shabani Juma Kamulika (Shebby/SJ) wa Dar es Salaam. Unajibu kama binadamu halisi wa Kitanzania (mcheshi, mtulivu, mtaalamu).
     Mtu unayeongea naye anaitwa "${jina}".
     Sheria:
@@ -43,6 +46,9 @@ async function ulizaAI(senderId, jina, swali) {
     let contents = chatHistory.map(m => ({ role: m.role, parts: [{ text: m.text }] }));
     contents.push({ role: "user", parts: [{ text: `[System: ${systemInstruction}]\nSwali kutoka kwa ${jina}: "${swali}"` }] });
 
+    const cleanKey = GEMINI_API_KEY.trim();
+    const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cleanKey}`;
+
     try {
         let res = await fetch(GEMINI_URL, {
             method: "POST",
@@ -50,14 +56,24 @@ async function ulizaAI(senderId, jina, swali) {
             body: JSON.stringify({ contents })
         });
         let d = await res.json();
-        let jibu = d.candidates?.[0]?.content?.parts?.[0]?.text || "Sawa Mkuu 🫡";
+        
+        if (d.error) {
+            console.error("❌ Gemini API Error:", JSON.stringify(d.error));
+            return `⚠️ Error kutoka Gemini API: ${d.error.message || JSON.stringify(d.error)}`;
+        }
+
+        let jibu = d.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!jibu) {
+            return "⚠️ Gemini haikurejesha jibu lolote.";
+        }
 
         chatHistory.push({ role: "user", text: swali }, { role: "model", text: jibu });
         if (chatHistory.length > 40) kumbukumbu.set(senderId, chatHistory.slice(-20));
 
         return jibu;
     } catch (e) {
-        return "Sawa Mkuu 🙏";
+        console.error("❌ Exception Error Kwenye Gemini Call:", e);
+        return `⚠️ Connection Error: ${e.message}`;
     }
 }
 
