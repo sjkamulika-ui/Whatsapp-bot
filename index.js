@@ -63,7 +63,6 @@ async function ulizaAI(senderId, jina, swali) {
 
 // 3. Main Bot Process (Baileys Engine)
 async function startBot() {
-    // Tumebadilisha folder name hapa ili kufuta session zilizofeli zamani
     const { state, saveCreds } = await useMultiFileAuthState('baileys_auth_info_v3');
     
     const sock = makeWASocket({
@@ -130,12 +129,11 @@ async function startBot() {
             }
 
             if (!BOT_IKO_WAZI) return;
-            if (msg.key.fromMe) continue; // Inazuia kujijibu mwenyewe
+            if (msg.key.fromMe) continue;
 
             let jina = msg.pushName || "Mrafiki";
             console.log(`📩 Ujumbe kutoka ${jina} (${senderNum}): ${text}`);
 
-            // Typing Indicator
             await sock.sendPresenceUpdate('composing', from);
             let jibu = await ulizaAI(from, jina, text);
             await sock.sendPresenceUpdate('paused', from);
