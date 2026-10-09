@@ -1,4 +1,4 @@
-require('dotenv').config();
+try{ require('dotenv').config(); }catch(e){}
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const http = require('http');
@@ -68,7 +68,6 @@ async function ulizaAI(senderId, jina, swali) {
     let contents = history.map(m => ({ role: m.role==='user'?'user':'model', parts: [{text:m.text}] }));
     contents.push({ role:"user", parts:[{text:swali}] });
     
-    // FIX KUBWA HAPA - v1 na gemini-2.0-flash BURE
     const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY.trim()}`;
     
     try {
